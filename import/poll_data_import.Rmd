@@ -1,0 +1,48 @@
+---
+title: "Poll Data Import"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+<style>
+#TOC {
+  background: url("https://images.squarespace-cdn.com/content/v1/5a397a42b1ffb615a2f64268/1580157288562-QZVW5Z3CYNZY4E1460JU/Hi+Res.png");
+  background-size: contain;
+  padding-top: 240px !important;
+  background-repeat: no-repeat;
+}
+</style>
+
+# General Thoughts
+
+Poll data came saved as csv from google drive link in party at the polls overall doc.
+
+```{r}
+library(tidyverse)
+library(here)
+```
+
+# Importing poll data
+
+
+```{r, echo = FALSE}
+polls <- read_csv(here::here("data", "polls", "gg18_precincts_and_polling_places.csv"))
+
+# check problems
+if(nrow(problems(polls)) == 0) print("ALL Good!") else(("Check data"))
+#all good!
+```
+
+Now what value is the precinct?
+```{r}
+library(ggmap)
+# filter for Baltimore
+polls <- polls %>% filter( CITY == "Baltimore")
+polls_geo <- ggmap::geocode(polls$ADDRESS1, output = "latlona", source = "google")
+polls_data <-bind_cols(polls, polls_geo)
+save(polls_data, file =here::here("data", "polls", "polls_data.rda"))
+write_csv(polls_data, file = here::here("data", "polls", "polls_data.csv"))
+```
+
