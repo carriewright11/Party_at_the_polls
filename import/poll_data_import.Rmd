@@ -43,5 +43,6 @@ polls <- polls %>% filter( CITY == "Baltimore")
 polls_geo <- ggmap::geocode(polls$ADDRESS1, output = "latlona", source = "google")
 polls_data <-bind_cols(polls, polls_geo)
 save(polls_data, file =here::here("data", "polls", "polls_data.rda"))
+write_csv(polls_data, file = here::here("data", "polls", "polls_data.csv"))
 ```
 
