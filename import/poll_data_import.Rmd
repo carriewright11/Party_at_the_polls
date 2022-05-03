@@ -40,7 +40,8 @@ Now what value is the precinct?
 library(ggmap)
 # filter for Baltimore
 polls <- polls %>% filter( CITY == "Baltimore")
-polls_geo <- ggmap::geocode(polls$ADDRESS1, output = "latlona", source = "google")
+polls <- polls %>% mutate(fulladdress = paste(ADDRESS1, CITY, ST, ZIP, sep = " "))
+polls_geo <- ggmap::geocode(polls$fulladdress, output = "latlona", source = "google")
 polls_data <-bind_cols(polls, polls_geo)
 save(polls_data, file =here::here("data", "polls", "polls_data.rda"))
 write_csv(polls_data, file = here::here("data", "polls", "polls_data.csv"))
