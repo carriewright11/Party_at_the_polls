@@ -1,0 +1,153 @@
+---
+title: "Wrangling Dec Data Phase 1"
+output: html_document
+---
+
+```{r, include = FALSE}
+library(tidyverse)
+library(magrittr)
+```
+
+
+```{r, include=FALSE}
+load(file = here::here("data", "voter_data","may_2020",  "may_2020_voter_data.rda"))
+load(file = here::here("data", "voter_data","dec_2020",  "dec_2020_voter_data.rda"))
+```
+
+
+## Checking the Data
+
+```{r}
+Dec_2020 %<>% filter(county_name == "BALTIMORE CITY")
+MayPrecinct <- May$Precinct
+DecPrecinct <- Dec_2020$precinct_code
+MayPrecinct[!(MayPrecinct %in% DecPrecinct)]
+DecPrecinct[!(DecPrecinct %in% MayPrecinct)]
+
+May_pre <-sort(unique(MayPrecinct))
+Dec_pre <-sort(unique(DecPrecinct))
+identical(May_pre, Dec_pre)
+
+setdiff(MayPrecinct, DecPrecinct)
+
+
+```
+
+
+```{r, eval = FALSE}
+filter(May, LastName == {"a name"}) %>% filter(MiddleName ==  {"a name"})
+filter(Dec_2020, last_name == {"same name as above"}) %>% filter(middle_name  ==  {"same name as above"})
+
+
+# earliest_registration_date date in dec appears to match StateRegistrationDate  in May
+# registration_date in Dec appears to match CountyRegistrationDate in May
+
+#Check another
+
+filter(Dec_2020, last_name == {"a name"}) %>% filter(middle_name  ==  {"a name"}) %>% pull(earliest_registration_date,registration_date )
+
+filter(May, LastName == {"same name as above"}) %>% filter(MiddleName  ==  {"same name as above"}) %>% pull(CountyRegistrationDate,StateRegistrationDate)
+
+```
+
+
+## Wrangling data
+
+### Overall voter turnout
+```{r}
+# reshape data to be long based on method of voting and select out only columns of interest
+new_data <- Dec_2020 %>% 
+  pivot_longer(cols = contains("method"), 
+               names_to = "election", 
+               values_to = "method") %>%
+  select(age_model_binned, gender, precinct_name, election, method)
+
+# Replace NA with did not vote
+new_data <-new_data %>% mutate(method = case_when(is.na(method)  ~ "No_vote",
+                                                TRUE ~ method))
+# count by method for each election of each precinct
+total_raw <-new_data %>% 
+    group_by(election) %>% 
+    dplyr::count(method)
+# reshape back to wide
+total_raw <-total_raw %>% pivot_wider(names_from = method, values_from = n)
+# replace new NA values to be zero
+total_raw<-total_raw %>% mutate_all(~replace(., is.na(.), 0))
+# move the no vote data to be after the voting methods
+total_raw <- total_raw %>% dplyr::relocate(No_vote, .after = unknown)
+# sum the different types of voting methods
+total_raw<- total_raw %>% rowwise() %>% mutate(Total_vote = sum(across(absentee:unknown)))
+# calculate percent vote
+total_turnout <- total_raw %>% rowwise() %>% mutate(turnout_perc = round((Total_vote/(Total_vote+ No_vote))*100, digits = 1)) 
+total_turnout%>% select(election, turnout_perc)
+```
+
+### Turnout by precinct, precinct and gender, and precinct and age
+
+```{r}
+
+
+# count by method for each election of each precinct
+overall_raw <-new_data %>% 
+  group_by(election, method, precinct_name) %>% 
+  dplyr::count(method)
+
+# also count by gender and age group
+gender_raw <-new_data %>% group_by(election,
+                                method, 
+                                precinct_name, 
+                                gender) %>% 
+                       dplyr::count(method)
+
+age_raw <-new_data %>% group_by(election,
+                                method, 
+                                precinct_name,
+                                age_model_binned) %>% 
+                       dplyr::count(method)
+#take a look
+head(overall_raw)
+head(gender_raw)
+head(age_raw)
+
+#reshape to wide
+overall_raw <-overall_raw %>% pivot_wider(names_from = method, values_from = n)
+gender_raw <-gender_raw %>% pivot_wider(names_from = method, values_from = n)
+age_raw <-age_raw %>% pivot_wider(names_from = method, values_from = n)
+
+# replace NA with Zero (as an NA here means there were no votes with that method- or no non votes if that happens)
+
+overall_raw<-overall_raw %>% mutate_all(~replace(., is.na(.), 0))
+gender_raw<-gender_raw %>% mutate_all(~replace(., is.na(.), 0))
+age_raw<-age_raw %>% mutate_all(~replace(., is.na(.), 0))
+
+# move No_vote to end
+overall_raw <- overall_raw %>% dplyr::relocate(No_vote, .after = unknown)
+gender_raw <- gender_raw %>% dplyr::relocate(No_vote, .after = unknown)
+age_raw <- age_raw %>% dplyr::relocate(No_vote, .after = unknown)
+
+overall_raw
+gender_raw
+age_raw
+
+# sum together all methods but "No_vote"
+
+overall_raw <- overall_raw %>% rowwise() %>% mutate(Total_vote= sum(across(absentee:unknown)))
+
+gender_raw <- gender_raw %>% rowwise() %>% mutate(Total_vote = sum(across(absentee:unknown)))
+
+age_raw <- age_raw %>% rowwise() %>% mutate(Total_vote = sum(across(absentee:unknown)))
+
+# Calculate percentage
+overall_turnout <- overall_raw %>% rowwise() %>% mutate(turnout_perc = round((Total_vote/(Total_vote+ No_vote))*100, digits = 1))
+gender_turnout <- gender_raw %>% rowwise() %>% mutate(turnout_perc = round((Total_vote/(Total_vote+ No_vote))*100, digits = 1))
+age_turnout <- age_raw %>% rowwise() %>% mutate(turnout_perc = round((Total_vote/(Total_vote+ No_vote))*100, digits = 1))
+
+glimpse(overall_turnout)
+glimpse(gender_turnout)
+glimpse(age_turnout)
+```
+
+```{r}
+save(total_turnout,overall_turnout, gender_turnout, age_turnout , file = here::here("data", "wrangled", "dec_wrangled.Rda"))
+
+```
