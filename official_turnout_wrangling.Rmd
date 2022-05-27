@@ -1,0 +1,82 @@
+---
+title: "official_turnout_wrangling"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(pdftools)
+libary(magrittr)
+```
+
+## Presidential General Election 2020 
+
+```{r}
+text_pdf<-pdftools::pdf_text(here::here("data, official_voter_turnout_PDFs, Report-2020-11-30.pdf"))
+split_text <-str_split(text_pdf, "\n")
+split_text <-unlist(split_text)
+precinct <-split_text[grepl(x = split_text, pattern = "[0-9]-[0-9]")]
+precinct <-precinct[!grepl(x = precinct, pattern = "PAGE")]
+uni_precinct <-unique(precinct)
+registered_voters <-split_text[grepl(x = split_text, pattern = "REGISTERED VOTERS - TOTAL")]
+registered_cast <-split_text[grepl(x = split_text, pattern = "BALLOTS CAST - TOTAL")]
+registered_turnout_perc <-split_text[grepl(x = split_text, pattern = "VOTER TURNOUT - TOTAL")]
+official_turnout<-tibble(uni_precinct, registered_voters, registered_cast, registered_turnout_perc)
+official_turnout %<>% mutate(registered_voters = 
+                            str_extract(string = registered_voters,
+                                        pattern = "[0-9]+"),
+                            registered_cast = 
+                            str_extract(string = registered_cast,
+                                        pattern = "[0-9]+"),
+                            registered_turnout_perc = 
+                              str_extract(string = registered_turnout_perc,
+                                        pattern = "[0-9]+.[0-9]+"))
+
+official_turnout %<>% separate(uni_precinct, into = c("abbreviation", "precinct"), sep = " ")
+official_turnout %<>% mutate(precinct = 
+                               str_remove(string = precinct, 
+                                          pattern ="-"))
+official_turnout %<>% mutate(precinct_no_lead = 
+                               str_remove(string = precinct, 
+                                          pattern ="^0+"))
+official_turnout %<>% relocate(precinct_no_lead, .after = precinct)
+
+write_csv(official_turnout, file = here::here("data", "wrangled", "official_turnout_2020.csv"))
+```
+
+
+## Presidential Primary Election 2016
+
+There is some extra data for some of the variables for more than the unique precincts. I did not get a chance yet to figure that out, but I think that the turnout it is correct.
+
+```{r}
+text_pdf<-pdftools::pdf_text(here::here("data, official_voter_turnout_PDFs, Report-2016-4-26.pdf"))
+split_text <-str_split(text_pdf, "\n")
+split_text <-unlist(split_text)
+precinct <-split_text[grepl(x = split_text, pattern = "[0-9]-[0-9]")]
+precinct <-precinct[!grepl(x = precinct, pattern = "PAGE")]
+uni_precinct <-unique(precinct)
+registered_voters <-split_text[grepl(x = split_text, pattern = "REGISTERED VOTERS - TOTAL")]
+registered_cast <-split_text[grepl(x = split_text, pattern = "BALLOTS CAST - TOTAL")]
+registered_turnout_perc <-split_text[grepl(x = split_text, pattern = "VOTER TURNOUT - TOTAL")]
+official_turnout<-tibble(uni_precinct, registered_turnout_perc)
+official_turnout %<>% mutate(registered_turnout_perc = 
+                              str_extract(string = registered_turnout_perc,
+                                        pattern = "[0-9]+.[0-9]+"))
+
+official_turnout %<>% separate(uni_precinct, into = c("abbreviation", "precinct"), sep = " ")
+official_turnout %<>% mutate(precinct = 
+                               str_remove(string = precinct, 
+                                          pattern ="-"))
+official_turnout %<>% mutate(precinct_no_lead = 
+                               str_remove(string = precinct, 
+                                          pattern ="^0+"))
+official_turnout %<>% relocate(precinct_no_lead, .after = precinct)
+
+write_csv(official_turnout, file = here::here("data", "wrangled", "official_turnout_2016_Primary.csv"))
+```
